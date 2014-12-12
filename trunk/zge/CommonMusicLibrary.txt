@@ -1,0 +1,183 @@
+ZZDC<?xml version="1.0" encoding="iso-8859-1" ?>
+<ZLibrary Comment="Common music library">
+  <Source>
+<![CDATA[/*
+  Common external music library for Windows and Android.
+  Uses ZgeSL library for Android and MCI API DLL (Winmm.dll) for Windows.
+
+  Version 1.0, November 2014.
+
+  Copyright (c) 2014 Radovan Cervenka
+*/
+
+const int MUSIC_RESULT_SUCCESS = 0;
+
+// Auxiliary variables.
+int __musicVolume;
+string __musicIsLooping;
+const int __MCI_OUT_LEN = 32;
+byte[__MCI_OUT_LEN] __mciOutput;
+
+// Auxiliary function: Returns string value from MCI output.
+string __mciResultToString(){
+  string s = "";
+  for(int i = 0; i < __MCI_OUT_LEN && __mciOutput[i] != 0; ++i){
+    s = s + chr(__mciOutput[i]);
+  }
+  return s;
+}
+
+// Auxiliary function: Returns int value from MCI output.
+int __mciResultToInt(){
+  return strToInt(__mciResultToString());
+}
+
+// Initializes the music playback system.
+void musicInit(){
+  if(ANDROID)
+    zslInit();
+}
+
+// Shuts down the music system.
+void musicExit(){
+  if(ANDROID)
+    zslExit();
+  else
+    mciSendStringA("close music", null, 0, 0);
+}
+
+// Plays a music file. The isAsset parameter determines whether the filename is
+// asset file, or URI. The isLooping parameter determines music looping.
+int musicPlayFile(string filename, int isAsset, int isLooping){
+  int res;
+  if(ANDROID){
+    res = zslPlayFile(filename, isAsset);
+    if(res) return res;
+
+    return zslSetLooping(isLooping);
+
+  } else {
+    mciSendStringA("close music", null, 0, 0);
+
+    res = mciSendStringA("open " + filename + " alias music", null, 0, 0);
+    if(res) return res;
+
+    __musicIsLooping = isLooping ? " repeat":"";
+    return mciSendStringA("play music" + __musicIsLooping, null, 0, 0);
+  }
+}
+
+// Stops the music. The playback head is forced to the beginning.
+void musicStop(){
+  if(ANDROID)
+    zslStop();
+  else
+    mciSendStringA("stop music", null, 0, 0);
+}
+
+// Pauses the music. The playback stays at the current position without moving.
+void musicPause(){
+  if(ANDROID)
+    zslPause();
+  else
+    mciSendStringA("pause music", null, 0, 0);
+}
+
+// Resumes the music playback from the paused or stopped position.
+void musicResume(){
+  if(ANDROID)
+    zslResume();
+  else {
+    mciSendStringA("status music mode", __mciOutput, __MCI_OUT_LEN, 0);
+
+    if(__mciResultToString() == "stopped")
+      mciSendStringA("play music" + __musicIsLooping, null, 0, 0);
+    else
+      mciSendStringA("resume music", null, 0, 0);
+  }
+}
+
+// Sets volume in the range 0 (no sound) to 1000 (max volume).
+// If stereo panning is applied, use max value for volume 500.
+void musicSetVolume(int volume){
+  if(ANDROID)
+    zslSetVolume(volume);
+  else {
+    __musicVolume = volume;
+    mciSendStringA("setaudio music volume to " + intToStr(volume), null, 0, 0);
+  }
+}
+
+// Sets stereo position (panning) in the range -1000 (left channel only) to
+// 1000 (right channel only). A panning 0 indicates the sound in the center.
+void musicSetPanning(int panning){
+  if(ANDROID)
+    zslSetPanning(panning);
+  else {
+    mciSendStringA("setaudio music left volume to " +
+      intToStr(__musicVolume * (1 - panning / 1000)), null, 0, 0);
+    mciSendStringA("setaudio music right volume to " +
+      intToStr(__musicVolume * (1 + panning / 1000)), null, 0, 0);
+  }
+}
+
+// Returns duration of music content in milliseconds.
+int musicGetDuration(){
+  if(ANDROID)
+    return zslGetDuration();
+  else {
+    mciSendStringA("status music length", __mciOutput, __MCI_OUT_LEN, 0);
+    return __mciResultToInt();
+  }
+}
+
+// Music play states:
+const int MUSIC_STATUS_UNDEFINED = -1;
+const int MUSIC_STATUS_STOPPED = 1;
+const int MUSIC_STATUS_PAUSED = 2;
+const int MUSIC_STATUS_PLAYING = 3;
+const int MUSIC_STATUS_NOT_READY = 4;
+
+// Returns the current music playing status.
+int musicGetStatus(){
+  if(ANDROID)
+    return zslGetPlayState();
+  else {
+    mciSendStringA("status music mode", __mciOutput, __MCI_OUT_LEN, 0);
+    switch(__mciResultToString()){
+      case "stopped": return MUSIC_STATUS_STOPPED;
+      case "paused": return MUSIC_STATUS_PAUSED;
+      case "playing": return MUSIC_STATUS_PLAYING;
+      case "not ready": return MUSIC_STATUS_NOT_READY;
+      default: return MUSIC_STATUS_UNDEFINED;
+    }
+  }
+}
+
+// Returns the current position of music playback in milliseconds.
+int musicGetPosition(){
+  if(ANDROID)
+    return zslGetPosition();
+  else {
+    mciSendStringA("status music position", __mciOutput, __MCI_OUT_LEN, 0);
+    return __mciResultToInt();
+  }
+}
+
+// Sets the music playback position in milliseconds. The mode parameter is
+// either SL_SEEKMODE_FAST for fast and less precise setting or
+// SL_SEEKMODE_ACCURATE for more precise but slower position setting.
+int musicSetPosition(int position, int mode){
+  if(ANDROID)
+    zslSetPosition(position, mode);
+  else {
+    mciSendStringA("status music mode", __mciOutput, __MCI_OUT_LEN, 0);
+
+    if(__mciResultToString() == "playing")
+      mciSendStringA("play music from " + intToStr(position) + __musicIsLooping, null, 0, 0);
+    else
+      mciSendStringA("seek music to " + intToStr(position), null, 0, 0);
+  }
+}]]>
+  </Source>
+</ZLibrary>

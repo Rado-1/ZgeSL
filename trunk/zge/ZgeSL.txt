@@ -1,0 +1,78 @@
+ZZDC<?xml version="1.0" encoding="iso-8859-1" ?>
+<ZExternalLibrary Comment="ZgeSL audio library" ModuleName="./libZgeSL.so" CallingConvention="1">
+  <Source>
+<![CDATA[/*
+  ZgeSE Music Library used to play MP3, OGG, ... files on Android.
+  Note: Change minSdkVersion to "9" in AndroidManifest.xml.
+
+  Download Android shared library and demos from:
+  http://googledrive.com/host/0BxwfQ8la88ouM0NnQVZ3dHBMT2c/
+
+  More info on forum:
+  http://www.emix8.org/forum/viewtopic.php?t=1123
+
+  Version 1.0, November 2014.
+
+  Copyright (c) 2014 Radovan Cervenka
+*/
+
+// Initializes the library.
+int zslInit() {}
+
+// Frees allocated resources.
+void zslExit() {}
+
+// Plays a music file (MP3, OGG, MIDI) either from the assets folder or from URI.
+int zslPlayFile(string filename, int isAsset) {}
+
+// Pauses the player. The playback head may be anywhere within the
+// content but is not trying to move.
+int zslPause() {}
+
+//  Starts to play. The playback head may be anywhere within the
+// content and is trying to move.
+int zslResume() {}
+
+// Stops the player. The playback head is forced to the beginning
+// of the content and is not trying to move.
+int zslStop() {}
+
+// Enables or disables looping. If the isLooping parameter is 0, the playback
+// is not looping. If 1, the playback loops.
+int zslSetLooping(int isLooping) {}
+
+// Returns the player’s current play state.
+int zslGetPlayState() {}
+
+// play states:
+const int SL_PLAYSTATE_STOPPED = 1;
+const int SL_PLAYSTATE_PAUSED	= 2;
+const int SL_PLAYSTATE_PLAYING = 3;
+
+// Returns the duration of the content in milliseconds.
+int zslGetDuration() {}
+
+// Sets the position of the playback head in milliseconds. The mode parameter
+// is either SL_SEEKMODE_FAST for fast and less precise setting or
+// SL_SEEKMODE_ACCURATE for more precise but slower position setting.
+int zslSetPosition(int position, int mode) {}
+
+// position modes:
+const int SL_SEEKMODE_FAST = 0x0001;
+const int SL_SEEKMODE_ACCURATE = 0x0002;
+
+// Returns the current position of the playback head in milliseconds.
+int zslGetPosition() {}
+
+// Sets the volume level in range from 0 to 1000; 500 is the default loudness.
+int zslSetVolume(int volume) {}
+
+// Mutes or unmutes playing. If the isMuted parameter is 0, the sound is muted.
+// If 1, the sound is unmuted.
+int zslSetMute(int isMuted) {}
+
+// Sets stereo position (panning) in the range -1000 (left channel only) to
+// 1000 (right channel only). A panning 0 indicates the sound in the center.
+int zslSetPanning(int panning) {}]]>
+  </Source>
+</ZExternalLibrary>

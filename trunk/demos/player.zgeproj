@@ -1,0 +1,426 @@
+<?xml version="1.0" encoding="iso-8859-1" ?>
+<ZApplication Name="App" Caption="Simple Player" ClearColor="0 0.1608 0.3255 1" ScreenMode="0" ViewportRatio="2" MouseVisible="255" NoSound="1" AndroidPackageName="com.rado1.SimplePlayer">
+  <Comment>
+<![CDATA[Demo of a simple music player for Android (ZgeSL librray) and
+Windows (Winmm.dll).
+
+Created by Radovan Cervenka (c) 2014]]>
+  </Comment>
+  <OnLoaded>
+    <ZExternalLibrary Comment="ZgeSL audio library" ModuleName="./libZgeSL.so" CallingConvention="1">
+      <Source>
+<![CDATA[/*
+  ZgeSE Music Library used to play MP3, OGG, ... files on Android.
+  Note: Change minSdkVersion to "9" in AndroidManifest.xml.
+
+  Download Android shared library and demos from:
+  http://googledrive.com/host/0BxwfQ8la88ouM0NnQVZ3dHBMT2c/
+
+  More info on forum:
+  http://www.emix8.org/forum/viewtopic.php?t=1123
+
+  Version 1.0, November 2014.
+
+  Copyright (c) 2014 Radovan Cervenka
+*/
+
+// Initializes the library.
+int zslInit() {}
+
+// Frees allocated resources.
+void zslExit() {}
+
+// Plays a music file (MP3, OGG, MIDI) either from the assets folder or from URI.
+int zslPlayFile(string filename, int isAsset) {}
+
+// Pauses the player. The playback head may be anywhere within the
+// content but is not trying to move.
+int zslPause() {}
+
+//  Starts to play. The playback head may be anywhere within the
+// content and is trying to move.
+int zslResume() {}
+
+// Stops the player. The playback head is forced to the beginning
+// of the content and is not trying to move.
+int zslStop() {}
+
+// Enables or disables looping. If the isLooping parameter is 0, the playback
+// is not looping. If 1, the playback loops.
+int zslSetLooping(int isLooping) {}
+
+// Returns the player’s current play state.
+int zslGetPlayState() {}
+
+// play states:
+const int SL_PLAYSTATE_STOPPED = 1;
+const int SL_PLAYSTATE_PAUSED	= 2;
+const int SL_PLAYSTATE_PLAYING = 3;
+
+// Returns the duration of the content in milliseconds.
+int zslGetDuration() {}
+
+// Sets the position of the playback head in milliseconds. The mode parameter
+// is either SL_SEEKMODE_FAST for fast and less precise setting or
+// SL_SEEKMODE_ACCURATE for more precise but slower position setting.
+int zslSetPosition(int position, int mode) {}
+
+// position modes:
+const int SL_SEEKMODE_FAST = 0x0001;
+const int SL_SEEKMODE_ACCURATE = 0x0002;
+
+// Returns the current position of the playback head in milliseconds.
+int zslGetPosition() {}
+
+// Sets the volume level in range from 0 to 1000; 500 is the default loudness.
+int zslSetVolume(int volume) {}
+
+// Mutes or unmutes playing. If the isMuted parameter is 0, the sound is muted.
+// If 1, the sound is unmuted.
+int zslSetMute(int isMuted) {}
+
+// Sets stereo position (panning) in the range -1000 (left channel only) to
+// 1000 (right channel only). A panning 0 indicates the sound in the center.
+int zslSetPanning(int panning) {}]]>
+      </Source>
+    </ZExternalLibrary>
+    <ZExternalLibrary Comment="Media Control Interface (MCI)" ModuleName="Winmm.dll" Source="int mciSendStringA(string lpszCommand, xptr lpszReturnString, int cchReturn, int hwndCallback){}"/>
+    <ZLibrary Comment="Common music library">
+      <Source>
+<![CDATA[/*
+  Common external music library for Windows and Android.
+  Uses ZgeSL library for Android and MCI API DLL (Winmm.dll) for Windows.
+
+  Version 1.0, November 2014.
+
+  Copyright (c) 2014 Radovan Cervenka
+*/
+
+const int MUSIC_RESULT_SUCCESS = 0;
+
+// Auxiliary variables.
+int __musicVolume;
+string __musicIsLooping;
+const int __MCI_OUT_LEN = 32;
+byte[__MCI_OUT_LEN] __mciOutput;
+
+// Auxiliary function: Returns string value from MCI output.
+string __mciResultToString(){
+  string s = "";
+  for(int i = 0; i < __MCI_OUT_LEN && __mciOutput[i] != 0; ++i){
+    s = s + chr(__mciOutput[i]);
+  }
+  return s;
+}
+
+// Auxiliary function: Returns int value from MCI output.
+int __mciResultToInt(){
+  return strToInt(__mciResultToString());
+}
+
+// Initializes the music playback system.
+void musicInit(){
+  if(ANDROID)
+    zslInit();
+}
+
+// Shuts down the music system.
+void musicExit(){
+  if(ANDROID)
+    zslExit();
+  else
+    mciSendStringA("close music", null, 0, 0);
+}
+
+// Plays a music file. The isAsset parameter determines whether the filename is
+// asset file, or URI. The isLooping parameter determines music looping.
+int musicPlayFile(string filename, int isAsset, int isLooping){
+  int res;
+  if(ANDROID){
+    res = zslPlayFile(filename, isAsset);
+    if(res) return res;
+
+    return zslSetLooping(isLooping);
+
+  } else {
+    mciSendStringA("close music", null, 0, 0);
+
+    res = mciSendStringA("open " + filename + " alias music", null, 0, 0);
+    if(res) return res;
+
+    __musicIsLooping = isLooping ? " repeat":"";
+    return mciSendStringA("play music" + __musicIsLooping, null, 0, 0);
+  }
+}
+
+// Stops the music. The playback head is forced to the beginning.
+void musicStop(){
+  if(ANDROID)
+    zslStop();
+  else
+    mciSendStringA("stop music", null, 0, 0);
+}
+
+// Pauses the music. The playback stays at the current position without moving.
+void musicPause(){
+  if(ANDROID)
+    zslPause();
+  else
+    mciSendStringA("pause music", null, 0, 0);
+}
+
+// Resumes the music playback from the paused or stopped position.
+void musicResume(){
+  if(ANDROID)
+    zslResume();
+  else {
+    mciSendStringA("status music mode", __mciOutput, __MCI_OUT_LEN, 0);
+
+    if(__mciResultToString() == "stopped")
+      mciSendStringA("play music" + __musicIsLooping, null, 0, 0);
+    else
+      mciSendStringA("resume music", null, 0, 0);
+  }
+}
+
+// Sets volume in the range 0 (no sound) to 1000 (max volume).
+// If stereo panning is applied, use max value for volume 500.
+void musicSetVolume(int volume){
+  if(ANDROID)
+    zslSetVolume(volume);
+  else {
+    __musicVolume = volume;
+    mciSendStringA("setaudio music volume to " + intToStr(volume), null, 0, 0);
+  }
+}
+
+// Sets stereo position (panning) in the range -1000 (left channel only) to
+// 1000 (right channel only). A panning 0 indicates the sound in the center.
+void musicSetPanning(int panning){
+  if(ANDROID)
+    zslSetPanning(panning);
+  else {
+    mciSendStringA("setaudio music left volume to " +
+      intToStr(__musicVolume * (1 - panning / 1000)), null, 0, 0);
+    mciSendStringA("setaudio music right volume to " +
+      intToStr(__musicVolume * (1 + panning / 1000)), null, 0, 0);
+  }
+}
+
+// Returns duration of music content in milliseconds.
+int musicGetDuration(){
+  if(ANDROID)
+    return zslGetDuration();
+  else {
+    mciSendStringA("status music length", __mciOutput, __MCI_OUT_LEN, 0);
+    return __mciResultToInt();
+  }
+}
+
+// Music play states:
+const int MUSIC_STATUS_UNDEFINED = -1;
+const int MUSIC_STATUS_STOPPED = 1;
+const int MUSIC_STATUS_PAUSED = 2;
+const int MUSIC_STATUS_PLAYING = 3;
+const int MUSIC_STATUS_NOT_READY = 4;
+
+// Returns the current music playing status.
+int musicGetStatus(){
+  if(ANDROID)
+    return zslGetPlayState();
+  else {
+    mciSendStringA("status music mode", __mciOutput, __MCI_OUT_LEN, 0);
+    switch(__mciResultToString()){
+      case "stopped": return MUSIC_STATUS_STOPPED;
+      case "paused": return MUSIC_STATUS_PAUSED;
+      case "playing": return MUSIC_STATUS_PLAYING;
+      case "not ready": return MUSIC_STATUS_NOT_READY;
+      default: return MUSIC_STATUS_UNDEFINED;
+    }
+  }
+}
+
+// Returns the current position of music playback in milliseconds.
+int musicGetPosition(){
+  if(ANDROID)
+    return zslGetPosition();
+  else {
+    mciSendStringA("status music position", __mciOutput, __MCI_OUT_LEN, 0);
+    return __mciResultToInt();
+  }
+}
+
+// Sets the music playback position in milliseconds. The mode parameter is
+// either SL_SEEKMODE_FAST for fast and less precise setting or
+// SL_SEEKMODE_ACCURATE for more precise but slower position setting.
+int musicSetPosition(int position, int mode){
+  if(ANDROID)
+    zslSetPosition(position, mode);
+  else {
+    mciSendStringA("status music mode", __mciOutput, __MCI_OUT_LEN, 0);
+
+    if(__mciResultToString() == "playing")
+      mciSendStringA("play music from " + intToStr(position) + __musicIsLooping, null, 0, 0);
+    else
+      mciSendStringA("seek music to " + intToStr(position), null, 0, 0);
+  }
+}]]>
+      </Source>
+    </ZLibrary>
+    <ZLibrary Comment="Globals">
+      <Source>
+<![CDATA[// boolean constants
+const int FALSE = 0;
+const int TRUE = 1;
+
+// music duration
+int D;
+
+// was/is Pause/Resume button pressed
+int wasButtonPressed, isButtonPressed;
+
+// is music paused
+int isPaused;]]>
+      </Source>
+    </ZLibrary>
+    <ZExpression Comment="Play">
+      <Expression>
+<![CDATA[musicInit();
+musicPlayFile("Sunset.mp3", 0, 1);
+//musicPlayFile("file:///sdcard/Download/Sunset.mp3", 0, 1);
+//musicPlayFile("http://www.mfiles.co.uk/mp3-downloads/Apocalypse.mp3", 0, 1);
+
+// getting duration in OpenSL ES can take a while
+for(D = -1 ; D <= 0; D = musicGetDuration());
+
+isPaused = FALSE;
+wasButtonPressed = FALSE;
+ButtonTexture.Texture = PauseBitmap;]]>
+      </Expression>
+    </ZExpression>
+  </OnLoaded>
+  <OnClose>
+    <ZExpression Comment="Stop">
+      <Expression>
+<![CDATA[musicStop();
+musicExit();]]>
+      </Expression>
+    </ZExpression>
+  </OnClose>
+  <OnUpdate>
+    <KeyPress Comment="Pause if lost focus" CharCode="255">
+      <OnPressed>
+        <ZExpression>
+          <Expression>
+<![CDATA[musicPause();
+ButtonTexture.Texture = PlayBitmap;
+isPaused = TRUE;]]>
+          </Expression>
+        </ZExpression>
+      </OnPressed>
+    </KeyPress>
+    <ZExpression Expression="isButtonPressed = FALSE;"/>
+    <KeyPress Comment="LMB/touch" Keys="{">
+      <OnPressed>
+        <ZExpression Comment="Set music playing">
+          <Expression>
+<![CDATA[float x = App.MousePosition.X, y = App.MousePosition.Y;
+
+// pause/resume button pressed
+if(x > -0.15 && x < 0.15 && y > -0.78 && y < -0.41) isButtonPressed = TRUE;
+
+// set playing position
+if(x > -0.91 && x < 0.91 && y > -0.12 && y < 0.12)
+  musicSetPosition(D * (x*0.54945 + 0.5), SL_SEEKMODE_ACCURATE);]]>
+          </Expression>
+        </ZExpression>
+      </OnPressed>
+    </KeyPress>
+    <ZExpression>
+      <Expression>
+<![CDATA[// TEST set volume
+//musicSetVolume((App.MousePosition.Y + 1) * 500);
+
+// update position slider
+Slider.Translate.X = 10.0*musicGetPosition()/D - 5.0;
+
+// pause/resume pressed
+if(!isButtonPressed && wasButtonPressed){
+  if(isPaused){
+    musicResume();
+    ButtonTexture.Texture = PauseBitmap;
+  } else {
+    musicPause();
+    ButtonTexture.Texture = PlayBitmap;
+  }
+
+  isPaused = 1 - isPaused;
+}
+
+wasButtonPressed = isButtonPressed;]]>
+      </Expression>
+    </ZExpression>
+  </OnUpdate>
+  <OnRender>
+    <UseMaterial Material="DefaultMaterial"/>
+    <RenderTransformGroup Comment="Timescale" Scale="10 0.8 1">
+      <Children>
+        <RenderSprite/>
+      </Children>
+    </RenderTransformGroup>
+    <RenderTransformGroup Comment="Timescale" Scale="9.94 0.74 1">
+      <Children>
+        <RenderSetColor Color="0 0.251 0.502 1"/>
+        <RenderSprite/>
+      </Children>
+    </RenderTransformGroup>
+    <RenderTransformGroup Name="Slider" Scale="0.3 1 1" Translate="-4.9851 0 0">
+      <Children>
+        <RenderSetColor Color="0 0.502 1 1"/>
+        <RenderSprite/>
+      </Children>
+    </RenderTransformGroup>
+    <RenderTransformGroup Name="SignalLevel" Scale="0 0.05 1" Translate="0 1.68 0">
+      <Children>
+        <RenderSetColor Color="1 1 0 1"/>
+        <RenderSprite/>
+      </Children>
+    </RenderTransformGroup>
+    <RenderTransformGroup Comment="Button" Scale="1.5 1.5 1" Translate="0 -2.5 0">
+      <Children>
+        <UseMaterial Material="ButtonMaterial"/>
+        <RenderSprite/>
+      </Children>
+    </RenderTransformGroup>
+  </OnRender>
+  <Content>
+    <Group Comment="Artwork">
+      <Children>
+        <Material Name="DefaultMaterial" Shading="1" Light="0" ZBuffer="0"/>
+        <Bitmap Name="PlayBitmap" Width="3" Height="3">
+          <Producers>
+            <BitmapFromFile Comment="Imported from play-128.png" Transparency="2" HasAlphaLayer="1">
+              <BitmapFile>
+<![CDATA[78DAEDDD59ABCD511880F1C331CFB3CCE41BB8754FB972734AA2D349C66426C99C3149E624173E80DCF80EDC93CC32CFF33CB53DEFC58A42D90765FFDFE7F711D6B3629FBDD77A575393244992244992244992244992244992244992F44D7FB4E0184E622526A219AE4EB5EDC567D47EE22266C27D504DFB50FB0D97D18A4E70D5AA61196A75BA8236B80F1ADF19D4DAE91A66A1335CC9C6D317BFFA3FBF1ED7311BEE83C63219B5BFE806E6A20B5CDDFFDF54D4FE819B5880AE7095F3F52F6E6121DC0739FB1777B008DDE0AAE7EB5FDCC5127487AB9FAF7F710FF1BD430F58215FFFE20156A027AC91AF7FF110ABE03EC8D9BF7884D5E805EBE4EB5F3CC61AF48695F2F52F9E602DFAC05AF9FA174FB11EF17B85D5F2F52F9E6323FAC17AF9FA172FB019715ECD8AF9FA172FB1150361CD7CFD8B57D88E41B06ABEFEDFEF839D180CEBE6EB5FBCC62E0C8195F3F52FDE603786C2DAF9FA176FB107C360F57CFD8B77887B2EC361FD7CFD8BF7D88F11B07F5EB10F0E6214EC9FD7071CC668D83FAF8F3882B1B07FEE7D7014E360FFBC3E2166218C87FD73EF83B8235FB5FBCEF6AFCF2954E9CCBAFDEB771A55B9C764FFF69902FBE715DF1DDA3FAF9883647FFBDBDF7FFFEDEFE73FFBFBF79FFDFDFEC7FE7EFF6B7F7FFFB17F63F3F7DF9CE21C509CFF1803CF7FE4EA7E089EFFCA25CE7F1EC048342594B57FDC0388CFF3D9EF0164EBEF3DA09CFDBD0798B3BFF78073F68F39003BE01C805CFD631ECC36380F2657FF9807B5050360D53CFD631EDC2638072C57FF67D800E700E6EA1F7340D7C139A0B9FA3B0F3A677FE7C1E7ECEF7B1039FBDFC772F82E50AEFEF11ED452F82E58AEFEF12EE062D83D57FFDB8877417D0F32577FDF05CED93FDE059F07DF05CFD5FF3AE6A0335CED3CFDAF6216ECFE7F9B84BFD9FD0ADA50B57B525515EFEA7DC69F76BF845634C3556D2C719FB9BDDD2F6006ECDEB8E21DF67ABB9FC77474842BD8F8E22EC4EF743F8769B07BF5C4BB185FF0B3EE67D1820E70A5AA2BCE4BC7E7F713388EF99800BB4B9224499224499224499224499224499224493FFA0AB115E23A]]>
+              </BitmapFile>
+            </BitmapFromFile>
+          </Producers>
+        </Bitmap>
+        <Bitmap Name="PauseBitmap" Width="3" Height="3">
+          <Producers>
+            <BitmapFromFile Comment="Imported from pause-128.png" Transparency="2" HasAlphaLayer="1">
+              <BitmapFile>
+<![CDATA[78DAEDD6B14D5D511045D187444403A488C81925500009A4449440E89668835E9090C868E0FB9C066CEBEB8E03DFB50A98377776F28E030000000000000000000000E0F72EE32E9EE3E54C8F7113FF6AE77EABDF3C77DFBEB56FEEDB776EFF101F715AE43D6E636ADFCEEE3756EDDBB7F7063BB67F8AD380AFB88ED5FB7666674FECDC5BECD4FE2A3EE334E42D56EFDC9953FBF616BDC92EFDEFE334E83B2E62D5BE9DD599933BF726BBF47F8DD3B095FF839D35BD6F6FB24BFF9F317DCF1FB16ADFCE9ADEB737D15F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D75F7FFDF5D7FFFFF61AD3F7BC8955FB76D6F4BEBDC92EFDEF63F296DF7111ABF6EDACCE9CDCB937D9A5FF557CC6D42DDF62F5CE9D39B56F6FD19B1C1B798A895B7EC575ACDEB7333B7B62E7DEE2D8D0437CC4AA3BBEC76D4CEDDBD9FDC6AA7DFBF6DEE0D8D865DCC573BC9CE93156FEEFFDCDFF60BF79EEBE7D6BDFDCB71F0000000000000000000000007FF00B6E82ADC6]]>
+              </BitmapFile>
+            </BitmapFromFile>
+          </Producers>
+        </Bitmap>
+        <Material Name="ButtonMaterial" Shading="1" Light="0" Blend="1" ZBuffer="0">
+          <Textures>
+            <MaterialTexture Name="ButtonTexture" Texture="PauseBitmap" TexCoords="1"/>
+          </Textures>
+        </Material>
+      </Children>
+    </Group>
+  </Content>
+</ZApplication>
