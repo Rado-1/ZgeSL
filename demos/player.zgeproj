@@ -286,7 +286,7 @@ int isPaused;]]>
     <ZExpression Comment="Play">
       <Expression>
 <![CDATA[musicInit();
-musicPlayFile("Sunset.mp3", 0, 1);
+musicPlayFile("Sunset.mp3", 1, 1);
 //musicPlayFile("file:///sdcard/Download/Sunset.mp3", 0, 1);
 //musicPlayFile("http://www.mfiles.co.uk/mp3-downloads/Apocalypse.mp3", 0, 1);
 
@@ -299,14 +299,6 @@ ButtonTexture.Texture = PauseBitmap;]]>
       </Expression>
     </ZExpression>
   </OnLoaded>
-  <OnClose>
-    <ZExpression Comment="Stop">
-      <Expression>
-<![CDATA[musicStop();
-musicExit();]]>
-      </Expression>
-    </ZExpression>
-  </OnClose>
   <OnUpdate>
     <KeyPress Comment="Pause if lost focus" CharCode="255">
       <OnPressed>
@@ -374,7 +366,7 @@ wasButtonPressed = isButtonPressed;]]>
         <RenderSprite/>
       </Children>
     </RenderTransformGroup>
-    <RenderTransformGroup Name="Slider" Scale="0.3 1 1" Translate="-4.9851 0 0">
+    <RenderTransformGroup Name="Slider" Scale="0.3 1 1" Translate="-4.7713 0 0">
       <Children>
         <RenderSetColor Color="0 0.502 1 1"/>
         <RenderSprite/>
@@ -393,6 +385,14 @@ wasButtonPressed = isButtonPressed;]]>
       </Children>
     </RenderTransformGroup>
   </OnRender>
+  <OnClose>
+    <ZExpression Comment="Stop">
+      <Expression>
+<![CDATA[musicStop();
+musicExit();]]>
+      </Expression>
+    </ZExpression>
+  </OnClose>
   <Content>
     <Group Comment="Artwork">
       <Children>
